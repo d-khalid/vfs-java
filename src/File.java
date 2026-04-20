@@ -58,6 +58,7 @@ class File implements FileSystemEntity {
 
         byte[] buffer = new byte[readSize];
 
+
         try (RandomAccessFile file = new RandomAccessFile(FileSystem.getOsFilePath().toString(), "r")) {
             int read = 0;
             int currentOffset = offset;
@@ -71,7 +72,9 @@ class File implements FileSystemEntity {
                 int chunk = Math.min(readSize - read, 1024 - offsetInBlock);
 
                 file.seek(physicalOffset);
-                file.read(buffer, read, chunk);
+
+                // Exact reads needed here
+                file.readFully(buffer, read, chunk);
 
                 read += chunk;
                 currentOffset += chunk;

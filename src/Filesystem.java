@@ -50,30 +50,60 @@ class FileSystem implements Serializable {
         return p1 + "/" + p2;
     }
 
-    void createFile(String fileName) {
-        String fullPath = FileSystem.joinPath(workingDir.getFullPath(), fileName);
+    void createFile(String path) {
+        String fullPath = FileSystem.joinPath(workingDir.getFullPath(), path);
 
         if(dirEntryTable.containsKey(fullPath)) {
             System.out.println("File exists! Nothing created.");
             return;
         }
 
+        // Split the path to separate the parent directory from the new file name
+        int lastSlash = path.lastIndexOf('/');
+        String parentPathStr = lastSlash >= 0 ? path.substring(0, lastSlash) : "";
+        String fileName = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+
+        // Find the parent directory (default to workingDir if no slashes were in the path)
+        Directory parentDir = parentPathStr.isEmpty() ? workingDir : getDir(parentPathStr);
+
+        if (parentDir == null) {
+            System.out.println("Error: Parent directory does not exist!");
+            return;
+        }
+
+        // Create the file and attach it to the correct parent
         File f = new File(fileName);
+        f.setParent(parentDir);
         dirEntryTable.put(fullPath, f);
-        workingDir.addChild(f);
+        parentDir.addChild(f);
     }
 
-    void createDir(String dirName) {
-        String fullPath = FileSystem.joinPath(workingDir.getFullPath(), dirName);
+    void createDir(String path) {
+        String fullPath = FileSystem.joinPath(workingDir.getFullPath(), path);
 
         if(dirEntryTable.containsKey(fullPath)) {
             System.out.println("Directory exists! Nothing created.");
             return;
         }
 
+        // Split the path to separate the parent directory from the new directory name
+        int lastSlash = path.lastIndexOf('/');
+        String parentPathStr = lastSlash >= 0 ? path.substring(0, lastSlash) : "";
+        String dirName = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+
+        // Find the parent directory
+        Directory parentDir = parentPathStr.isEmpty() ? workingDir : getDir(parentPathStr);
+
+        if (parentDir == null) {
+            System.out.println("Error: Parent directory does not exist!");
+            return;
+        }
+
+        // Create the directory and attach it to the correct parent
         Directory d = new Directory(dirName);
+        d.setParent(parentDir);
         dirEntryTable.put(fullPath, d);
-        workingDir.addChild(d);
+        parentDir.addChild(d);
     }
 
     void listAll() {
@@ -129,22 +159,23 @@ class FileSystem implements Serializable {
     void delete(String path) {
         String fullPath = FileSystem.joinPath(workingDir.getFullPath(), path);
 
-        // Remove from the lookup table
-        FileSystemEntity entity = dirEntryTable.remove(fullPath);
+        // Look up the entity first
+        FileSystemEntity entity = dirEntryTable.get(fullPath);
 
         if (entity == null) {
             System.out.println("File or directory not found!");
             return;
         }
 
+        // Recursively remove this entity AND all its nested children from the HashMap
+        removePathsFromTable(entity);
+
         // Free its blocks
+
         entity.delete();
 
         // Remove it from its parent directory's children list
-        int lastSlash = fullPath.lastIndexOf('/');
-        String parentPath = lastSlash > 0 ? fullPath.substring(0, lastSlash) : "/";
-
-        Directory parent = (Directory) dirEntryTable.get(parentPath);
+        Directory parent = entity.getParent();
         if (parent != null) {
             parent.removeChild(entity);
         }

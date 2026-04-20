@@ -13,8 +13,14 @@ class Directory implements FileSystemEntity {
         this.name = name;
     }
 
-    public void delete() {}
+    public void delete() {
+        // Recursively call delete on all children
+        for (FileSystemEntity child : children) {
+            child.delete();
+        }
 
+        children.clear();
+    }
     public void setName(String newName) {
         this.name = newName;
     }

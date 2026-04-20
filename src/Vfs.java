@@ -36,16 +36,24 @@ public class Vfs {
         while (true) {
             System.out.printf(ANSI_GREEN + "%s> " + ANSI_RESET, fs.getWorkingDir().getFullPath());
             System.out.flush();
-            
+
             String input = scanner.nextLine().trim();
             if (input.isEmpty()) continue;
 
-            // Split by space, but allow grouping quotes for text later if needed
-            String[] tokens = input.split("\\s+");
-            String command = tokens[0].toLowerCase();
+            // Split on spaces, but ONLY if they are followed by an even number of quotes
+            String[] args = input.split("\\s+(?=([^\"]*\"[^\"]*\")*[^\"]*$)");
+
+            // Remove end quotes from parsed strings
+            for (int i = 0; i < args.length; i++) {
+                args[i] = args[i].replace("\"", "");
+            }
+
+            if (args.length == 0) continue;
+
+            String command = args[0].toLowerCase();
 
             try {
-                processCommand(command, tokens);
+                processCommand(command, args);
             } catch (Exception e) {
                 System.err.println("Error processing command: " + e.getMessage());
             }
@@ -91,33 +99,38 @@ public class Vfs {
             case "write":
                 // "write <fName> <text>
                 // write <fName> <offset> <text>
-                if (checkArgs(args, 3)) {
-                    File f = fs.getFile(args[1]);
-                    if (f == null) break;
-
-                    f.write(args[2]);
-                } else if (checkArgs(args, 4)) {
+                if (checkArgs(args, 4)) {
                     File f = fs.getFile(args[1]);
                     if (f == null) break;
 
                     f.write(args[3], Integer.parseInt(args[2]));
+                }
+                else if (checkArgs(args, 3)) {
+                    File f = fs.getFile(args[1]);
+                    if (f == null) break;
+
+                    f.write(args[2]);
                 }
 
                 break;
             case "read":
                 // Usage: read <fName> OR read <fName> <start> <size>
 
-                if (checkArgs(args, 2)) {
+                if (checkArgs(args, 4)) {
+                    File f = fs.getFile(args[1]);
+                    if (f == null) break;
+
+                    System.out.println(new String(
+                            f.readFrom(Integer.parseInt(args[2]), Integer.parseInt(args[3])),
+                            StandardCharsets.UTF_8)
+                    );
+                }
+                else if (checkArgs(args, 2)) {
                     File f = fs.getFile(args[1]);
                     if (f == null) break;
 
                     System.out.println(new String(f.readAllBytes(), StandardCharsets.UTF_8));
 
-                } else if (checkArgs(args, 4)) {
-                    File f = fs.getFile(args[1]);
-                    if (f == null) break;
-
-                    System.out.println(new String(f.readFrom(Integer.parseInt(args[2]), Integer.parseInt(args[3])), StandardCharsets.UTF_8));
                 }
                 break;
             case "move_in_file":
@@ -154,11 +167,7 @@ public class Vfs {
 
     // Helper to ensure enough arguments are passed
     private boolean checkArgs(String[] args, int expectedLength) {
-        if (args.length < expectedLength) {
-            System.out.println("Error: Missing arguments.");
-            return false;
-        }
-        return true;
+        return args.length == expectedLength;
     }
 
     // Helper to fetch an open file and alert the user if it's not open
@@ -190,7 +199,13 @@ public class Vfs {
     }
 
     public static void main(String[] args) {
-        Vfs cli = new Vfs("/home/alkalinelemon/Documentsvfs_disk.dat");
+        if(args.length != 1)
+        {
+            System.out.print("Usage: vfs <dat_file_name>\tThe file to use for the virtual file system\n");
+            return;
+        }
+
+        Vfs cli = new Vfs(args[0]);
         cli.start();
     }
 }
